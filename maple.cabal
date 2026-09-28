@@ -39,4 +39,8 @@ test-suite maple-test
   main-is: Main.hs
   build-depends:
     base ^>=4.20.2.0,
+    hspec ^>= 2.11,
     maple,
+    symbolize,
+    text,
+    unordered-containers

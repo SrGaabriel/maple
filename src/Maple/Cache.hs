@@ -12,8 +12,8 @@ data NodeCache = NodeCache
     , tokenCache :: IORef (HM.HashMap TokenKey GreenToken)
     }
 
-newCache :: IO NodeCache
-newCache = NodeCache <$> newIORef HM.empty <*> newIORef HM.empty
+mkCache :: IO NodeCache
+mkCache = NodeCache <$> newIORef HM.empty <*> newIORef HM.empty
 
 node :: NodeCache -> RawKind -> [Green] -> IO GreenNode
 node cache kind children = do
@@ -23,6 +23,7 @@ node cache kind children = do
     case HM.lookup key m of
         Just existing -> pure existing
         Nothing -> do
+            putStrLn $ "cache miss"
             let width = sum $ map greenWidth children
             new <- evaluate $ GreenNode kind width children
             writeIORef (nodeCache cache) (HM.insert key new m)
