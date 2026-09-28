@@ -1,11 +1,13 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Maple.Green where
 
 import Control.Exception (evaluate)
 import Data.Hashable (Hashable)
+import qualified Data.Vector.Strict as V
 import GHC.Generics (Generic)
 import GHC.StableName (StableName, makeStableName)
 import Symbolize (Symbol)
@@ -47,7 +49,7 @@ data GreenToken = GreenToken
 data GreenNode = GreenNode
     { gnKind :: !RawKind
     , gnWidth :: !Int
-    , gnChildren :: [Green]
+    , gnChildren :: !(V.Vector Green)
     }
 
 greenEq :: Green -> Green -> IO Bool

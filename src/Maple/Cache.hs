@@ -1,6 +1,7 @@
 module Maple.Cache where
 
 import qualified Data.HashMap.Strict as HM
+import qualified Data.Vector.Strict as V
 
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import GHC.IO (evaluate)
@@ -15,16 +16,15 @@ data NodeCache = NodeCache
 mkCache :: IO NodeCache
 mkCache = NodeCache <$> newIORef HM.empty <*> newIORef HM.empty
 
-node :: NodeCache -> RawKind -> [Green] -> IO GreenNode
+node :: NodeCache -> RawKind -> V.Vector Green -> IO GreenNode
 node cache kind children = do
     keys <- mapM childKey children
-    let key = NodeKey kind keys
+    let key = NodeKey kind (V.toList keys)
     m <- readIORef (nodeCache cache)
     case HM.lookup key m of
         Just existing -> pure existing
         Nothing -> do
-            putStrLn $ "cache miss"
-            let width = sum $ map greenWidth children
+            let width = V.sum $ V.map greenWidth children
             new <- evaluate $ GreenNode kind width children
             writeIORef (nodeCache cache) (HM.insert key new m)
             pure new
