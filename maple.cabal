@@ -1,6 +1,10 @@
 cabal-version: 3.14
 name: maple
 version: 0.1.0.0
+synopsis: Red-green trees lossless syntax trees (CSTs) library
+description:
+  Maple is a Haskell library for lossless syntax trees (CSTs). Specifically, we work with data structures called red-green trees also used by roslyn and rust-analyzer.
+
 license: Apache-2.0
 license-file: LICENSE
 author: Gabriel
