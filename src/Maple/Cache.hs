@@ -3,39 +3,48 @@ module Maple.Cache where
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Vector.Strict as V
 
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import GHC.IO (evaluate)
 import Maple.Green (Green, GreenNode (GreenNode), GreenToken (GreenToken), NodeKey (NodeKey), RawKind, TokenKey (TokenKey), childKey, greenWidth)
 import Symbolize (Symbol)
 
 data NodeCache = NodeCache
-    { nodeCache :: IORef (HM.HashMap NodeKey GreenNode)
-    , tokenCache :: IORef (HM.HashMap TokenKey GreenToken)
+    { nodeCache :: (HM.HashMap NodeKey GreenNode)
+    , tokenCache :: (HM.HashMap TokenKey GreenToken)
     }
 
-mkCache :: IO NodeCache
-mkCache = NodeCache <$> newIORef HM.empty <*> newIORef HM.empty
+mkCache :: NodeCache
+mkCache = NodeCache HM.empty HM.empty
 
-node :: NodeCache -> RawKind -> V.Vector Green -> IO GreenNode
+node :: NodeCache -> RawKind -> V.Vector Green -> IO (GreenNode, NodeCache)
 node cache kind children = do
     keys <- mapM childKey children
     let key = NodeKey kind (V.toList keys)
-    m <- readIORef (nodeCache cache)
-    case HM.lookup key m of
-        Just existing -> pure existing
+    let nCache = nodeCache cache
+    case HM.lookup key nCache of
+        Just existing -> pure (existing, cache)
         Nothing -> do
             let width = V.sum $ V.map greenWidth children
             new <- evaluate $ GreenNode kind width children
-            writeIORef (nodeCache cache) (HM.insert key new m)
-            pure new
+            let nCache' = HM.insert key new nCache
+            pure
+                ( new
+                , cache
+                    { nodeCache = nCache'
+                    }
+                )
 
-token :: NodeCache -> RawKind -> Symbol -> Int -> IO GreenToken
+token :: NodeCache -> RawKind -> Symbol -> Int -> IO (GreenToken, NodeCache)
 token cache kind symbol width = do
     let key = TokenKey kind symbol
-    m <- readIORef (tokenCache cache)
-    case HM.lookup key m of
-        Just existing -> pure existing
+    let tCache = tokenCache cache
+    case HM.lookup key tCache of
+        Just existing -> pure (existing, cache)
         Nothing -> do
             new <- evaluate $ GreenToken kind symbol width
-            writeIORef (tokenCache cache) (HM.insert key new m)
-            pure new
+            let tCache' = HM.insert key new tCache
+            pure
+                ( new
+                , cache
+                    { tokenCache = tCache'
+                    }
+                )

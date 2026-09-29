@@ -2,8 +2,10 @@
 
 module Maple.Red where
 
-import Maple.Green (GreenNode (gnWidth), GreenToken)
-import Maple.Position (Pos, Range (Range))
+import Data.List (mapAccumL)
+import qualified Data.Vector.Strict as V
+import Maple.Green (Green (GNode, GToken), GreenNode (GreenNode, gnChildren, gnWidth), GreenToken, greenWidth)
+import Maple.Position (Range (Range))
 
 data Red
     = RNode RedNode
@@ -13,16 +15,58 @@ data RedNode
     = RedNode
     { rnGreen :: GreenNode
     , rnParent :: Maybe (RedNode)
-    , rnPos :: !Pos
+    , rnRange :: !Range
+    , rnIndex :: !Int
     }
 
 data RedToken
     = RedToken
     { rtGreen :: GreenToken
-    , rtPos :: !Pos
+    , rtRange :: !Range
     , rtParent :: RedNode
     , rtIndex :: !Int
     }
 
-rnRange :: RedNode -> Range
-rnRange (RedNode{rnPos, rnGreen}) = Range rnPos (rnPos + gnWidth rnGreen)
+materializeRoot :: GreenNode -> RedNode
+materializeRoot green@(GreenNode{gnWidth}) =
+    let range = Range 0 gnWidth
+    in RedNode
+        { rnGreen = green
+        , rnRange = range
+        , rnParent = Nothing
+        , rnIndex = 0
+        }
+
+materializeChildren :: RedNode -> V.Vector Red
+materializeChildren
+    parent@( RedNode
+                { rnGreen = GreenNode{gnChildren}
+                , rnRange = (Range start _)
+                }
+            ) =
+        snd
+            $ mapAccumL
+                ( \prev (i, green) ->
+                    let width = greenWidth green
+                        end = prev + width
+                        child = case green of
+                            GToken greenToken ->
+                                RToken
+                                    RedToken
+                                        { rtRange = Range prev end
+                                        , rtIndex = i
+                                        , rtParent = parent
+                                        , rtGreen = greenToken
+                                        }
+                            GNode greenNode ->
+                                RNode
+                                    RedNode
+                                        { rnRange = Range prev end
+                                        , rnParent = Just parent
+                                        , rnGreen = greenNode
+                                        , rnIndex = i
+                                        }
+                    in end `seq` (end, child)
+                )
+                start
+                (V.indexed gnChildren)
