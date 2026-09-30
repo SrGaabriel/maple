@@ -1,5 +1,5 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -90,7 +90,7 @@ finishNode = do
                 }
         )
 
-runBuilderT :: (MonadIO m) => Cache.NodeCache -> BuilderT m () -> m (GreenNode, Cache.NodeCache)
+runBuilderT :: (MonadIO m) => Cache.NodeCache -> BuilderT m a -> m (GreenNode, Cache.NodeCache)
 runBuilderT cache (BuilderT builder) = do
     (_, st) <- runStateT builder initialState
     case bsRoots st of
@@ -104,10 +104,10 @@ runBuilderT cache (BuilderT builder) = do
             , bsRoots = []
             }
 
-cleanRunBuilderT :: (MonadIO m) => BuilderT m () -> m (GreenNode, Cache.NodeCache)
+cleanRunBuilderT :: (MonadIO m) => BuilderT m a -> m (GreenNode, Cache.NodeCache)
 cleanRunBuilderT = runBuilderT Cache.mkCache
 
-runBuilder :: Cache.NodeCache -> BuilderM () -> IO (GreenNode, Cache.NodeCache)
+runBuilder :: Cache.NodeCache -> BuilderM a -> IO (GreenNode, Cache.NodeCache)
 runBuilder = runBuilderT
 
 cleanRunBuilder :: BuilderM () -> IO (GreenNode, Cache.NodeCache)
