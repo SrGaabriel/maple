@@ -20,6 +20,7 @@ library
   import: warnings
   exposed-modules:
     Maple
+    Maple.Ast
     Maple.Builder
     Maple.Cache
     Maple.Green
@@ -36,11 +37,11 @@ library
     vector ^>=0.13.1
 
   hs-source-dirs: src
-  default-language: Haskell2010
+  default-language: GHC2024
 
 test-suite maple-test
   import: warnings
-  default-language: Haskell2010
+  default-language: GHC2024
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Main.hs
