@@ -71,13 +71,13 @@ token kind text = do
 finishNode :: (MonadIO m) => BuilderT m ()
 finishNode = do
     ~BuilderState{bsOpen = Frame{frKind, frCount, frChildren} : frUpper, bsRoots, bsCache} <- get
-    let vChildren = V.fromListN frCount frChildren
+    let vChildren = V.fromListN frCount (reverse frChildren)
     (node, bsCache') <- liftIO $ Cache.node bsCache frKind vChildren
 
     let (bsOpen', bsRoots') = case frUpper of
             [] -> ([], (GNode node) : bsRoots)
-            (parent@Frame{frChildren = pChildren} : xs) ->
-                ( parent{frChildren = (GNode node) : pChildren} : xs
+            (parent@Frame{frChildren = pChildren, frCount = pCount} : xs) ->
+                ( parent{frChildren = (GNode node) : pChildren, frCount = pCount + 1} : xs
                 , bsRoots
                 )
 
