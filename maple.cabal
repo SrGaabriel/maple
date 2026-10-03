@@ -25,6 +25,7 @@ library
     Maple.Cache
     Maple.Green
     Maple.Position
+    Maple.Print
     Maple.Red
 
   build-depends:

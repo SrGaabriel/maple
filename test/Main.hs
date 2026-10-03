@@ -10,6 +10,7 @@ import Data.Maybe (isJust, isNothing)
 import Maple.Ast (AstNode, OfKind (OfKind), SyntaxKind (toRaw), cast)
 import Maple.Builder (BuilderM, cleanRunBuilder, finishNode, runBuilder, startNode, token)
 import Maple.Green (GreenNode (gnWidth), greenNodeEq)
+import Maple.Print (prettyGreen, prettyRed, showKind)
 import Maple.Red (RedNode, materializeRoot)
 import Test.Hspec
 
@@ -53,3 +54,12 @@ main = hspec $ do
             let root = materializeRoot n
             isJust (cast root :: Maybe MulExpr) `shouldBe` True
             isNothing (cast root :: Maybe NumberExpr) `shouldBe` True
+    describe "Print" $ do
+        it "pretty prints a green tree" $ do
+            (n, _) <- cleanRunBuilder twoTimesTwo
+            prettyGreen (showKind @Kind) n
+                `shouldBe` "KMul 3\n  KNumber \"2\"\n  KStar \"*\"\n  KNumber \"2\"\n"
+        it "pretty prints a red tree" $ do
+            (n, _) <- cleanRunBuilder twoTimesTwo
+            prettyRed (showKind @Kind) (materializeRoot n)
+                `shouldBe` "KMul@0..3\n  KNumber@0..1 \"2\"\n  KStar@1..2 \"*\"\n  KNumber@2..3 \"2\"\n"
