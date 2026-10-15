@@ -2,10 +2,15 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DataKinds #-}
 
 module Maple.Ast where
 
+import Control.Applicative ((<|>))
 import Data.Data (Data, dataTypeOf, fromConstr, readConstr)
+import Data.Maybe (fromMaybe)
+import GHC.Generics (C, D, Generic (Rep, from, to), Generically (Generically), K1 (K1), M1 (M1), S, U1, (:*:), (:+:) (L1, R1))
+import GHC.TypeLits (ErrorMessage (Text), TypeError)
 import Data.Proxy (Proxy (Proxy))
 import Data.Typeable (Typeable, tyConName, typeRep, typeRepTyCon)
 import Maple.Green (GreenNode (GreenNode, gnKind), RawKind)
@@ -36,13 +41,13 @@ castRed :: (AstNode t) => Red -> Maybe t
 castRed (RNode node) = cast node
 castRed _ = Nothing
 
-child    :: forall a. AstNode a => RedNode -> Maybe a
+child :: (AstNode a) => RedNode -> Maybe a
 child = firstJust castRed . materializeChildren
 
-children :: forall a. AstNode a => RedNode -> V.Vector a
+children :: (AstNode a) => RedNode -> V.Vector a
 children red = mapMaybe castRed (materializeChildren red)
 
-nthChild :: forall a. AstNode a => Int -> RedNode -> Maybe a
+nthChild :: (AstNode a) => Int -> RedNode -> Maybe a
 nthChild n = nthJust castRed n . materializeChildren
 
 tokenOf :: (SyntaxKind k) => k -> RedNode -> Maybe RedToken
@@ -100,17 +105,99 @@ kindVal =
 newtype OfKind (k :: kind) = OfKind RedNode
 
 instance (Typeable k, Data kind, SyntaxKind kind) => AstNode (OfKind (k :: kind)) where
-    canCast _ = (== raw)
-      where
-        raw = toRaw (kindVal @k)
+    canCast = let raw = toRaw (kindVal @k) in \_ -> (== raw)
     unsafeWrap = OfKind
     syntax (OfKind n) = n
 
 newtype TokenOfKind (k :: kind) = TokenOfKind RedToken
 
 instance (Typeable k, Data kind, SyntaxKind kind) => AstToken (TokenOfKind (k :: kind)) where
-    canCastToken _ = (== raw)
-      where
-        raw = toRaw (kindVal @k)
+    canCastToken = let raw = toRaw (kindVal @k) in \_ -> (== raw)
     unsafeWrapToken = TokenOfKind
     syntaxToken (TokenOfKind t) = t
+
+instance (Generic a, GAstNode (Rep a)) => AstNode (Generically a) where
+    canCast _ = gCanCast (Proxy @(Rep a))
+    unsafeWrap n =
+        Generically . to . fromMaybe (error "Maple.Ast.unsafeWrap: no constructor accepts this kind") $
+            gWrap n
+    syntax (Generically a) = gSyntax (from a)
+
+class GAstNode f where
+    gCanCast :: Proxy f -> RawKind -> Bool
+    gWrap :: RedNode -> Maybe (f p)
+    gSyntax :: f p -> RedNode
+
+instance (GAstNode f) => GAstNode (M1 D c f) where
+    gCanCast _ = gCanCast (Proxy @f)
+    gWrap = fmap M1 . gWrap
+    gSyntax (M1 x) = gSyntax x
+
+instance (GAstNode f) => GAstNode (M1 C c f) where
+    gCanCast _ = gCanCast (Proxy @f)
+    gWrap = fmap M1 . gWrap
+    gSyntax (M1 x) = gSyntax x
+
+instance (GAstNode f, GAstNode g) => GAstNode (f :+: g) where
+    gCanCast _ k = gCanCast (Proxy @f) k || gCanCast (Proxy @g) k
+    gWrap n = (L1 <$> gWrap n) <|> (R1 <$> gWrap n)
+    gSyntax (L1 x) = gSyntax x
+    gSyntax (R1 x) = gSyntax x
+
+instance (AstNode a) => GAstNode (M1 S c (K1 i a)) where
+    gCanCast _ = canCast (Proxy @a)
+    gWrap = fmap (M1 . K1) . cast
+    gSyntax (M1 (K1 a)) = syntax a
+
+instance (TypeError ('Text "AstNode via Generically: every constructor must have exactly one field")) => GAstNode U1 where
+    gCanCast = undefined
+    gWrap = undefined
+    gSyntax = undefined
+
+instance (TypeError ('Text "AstNode via Generically: every constructor must have exactly one field")) => GAstNode (f :*: g) where
+    gCanCast = undefined
+    gWrap = undefined
+    gSyntax = undefined
+
+instance (Generic t, GAstToken (Rep t)) => AstToken (Generically t) where
+    canCastToken _ = gCanCastToken (Proxy @(Rep t))
+    unsafeWrapToken tok =
+        Generically . to . fromMaybe (error "Maple.Ast.unsafeWrapToken: no constructor accepts this kind") $
+            gWrapToken tok
+    syntaxToken (Generically t) = gSyntaxToken (from t)
+
+class GAstToken f where
+    gCanCastToken :: Proxy f -> RawKind -> Bool
+    gWrapToken :: RedToken -> Maybe (f p)
+    gSyntaxToken :: f p -> RedToken
+
+instance (GAstToken f) => GAstToken (M1 D c f) where
+    gCanCastToken _ = gCanCastToken (Proxy @f)
+    gWrapToken = fmap M1 . gWrapToken
+    gSyntaxToken (M1 x) = gSyntaxToken x
+
+instance (GAstToken f) => GAstToken (M1 C c f) where
+    gCanCastToken _ = gCanCastToken (Proxy @f)
+    gWrapToken = fmap M1 . gWrapToken
+    gSyntaxToken (M1 x) = gSyntaxToken x
+
+instance (GAstToken f, GAstToken g) => GAstToken (f :+: g) where
+    gCanCastToken _ k = gCanCastToken (Proxy @f) k || gCanCastToken (Proxy @g) k
+    gWrapToken t = (L1 <$> gWrapToken t) <|> (R1 <$> gWrapToken t)
+    gSyntaxToken (L1 x) = gSyntaxToken x
+    gSyntaxToken (R1 x) = gSyntaxToken x
+
+instance (AstToken a) => GAstToken (M1 S c (K1 i a)) where
+    gCanCastToken _ = canCastToken (Proxy @a)
+    gWrapToken = fmap (M1 . K1) . castToken
+    gSyntaxToken (M1 (K1 a)) = syntaxToken a
+
+instance (TypeError ('Text "AstToken via Generically: every constructor must have exactly one field")) => GAstToken U1 where
+    gCanCastToken = undefined
+    gWrapToken = undefined
+    gSyntaxToken = undefined
+
+instance (TypeError ('Text "AstToken via Generically: every constructor must have exactly one field")) => GAstToken (f :*: g) where
+    gCanCastToken = undefined
+    gWrapToken = undefined
+    gSyntaxToken = undefined
