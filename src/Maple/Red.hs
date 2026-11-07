@@ -6,7 +6,7 @@ import Data.List (mapAccumL)
 import Data.Text (Text)
 import qualified Data.Vector.Strict as V
 import Maple.Green (Green (GNode, GToken), GreenNode (GreenNode, gnChildren, gnKind, gnWidth), GreenToken (gtKind, gtSymbol), RawKind, greenWidth)
-import Maple.Position (Range (Range))
+import Maple.Position (Range (Range), Span (Span), TreeId)
 import Symbolize (unintern)
 
 data Red
@@ -16,6 +16,7 @@ data Red
 data RedNode
     = RedNode
     { rnGreen :: GreenNode
+    , rnTree :: !TreeId
     , rnParent :: Maybe (RedNode)
     , rnRange :: !Range
     , rnIndex :: !Int
@@ -30,11 +31,12 @@ data RedToken
     , rtIndex :: !Int
     }
 
-mkRedNode :: GreenNode -> Maybe RedNode -> Range -> Int -> RedNode
-mkRedNode green parent range index =
+mkRedNode :: TreeId -> GreenNode -> Maybe RedNode -> Range -> Int -> RedNode
+mkRedNode tree green parent range index =
     let node =
             RedNode
                 { rnGreen = green
+                , rnTree = tree
                 , rnParent = parent
                 , rnRange = range
                 , rnIndex = index
@@ -42,8 +44,8 @@ mkRedNode green parent range index =
                 }
     in node
 
-materializeRoot :: GreenNode -> RedNode
-materializeRoot green@(GreenNode{gnWidth}) = mkRedNode green Nothing (Range 0 gnWidth) 0
+materializeRoot :: TreeId -> GreenNode -> RedNode
+materializeRoot tree green@(GreenNode{gnWidth}) = mkRedNode tree green Nothing (Range 0 gnWidth) 0
 
 materializeChildren :: RedNode -> V.Vector Red
 materializeChildren = rnChildren
@@ -57,10 +59,20 @@ tokenKind = gtKind . rtGreen
 tokenText :: RedToken -> Text
 tokenText = unintern . gtSymbol . rtGreen
 
+tokenTree :: RedToken -> TreeId
+tokenTree = rnTree . rtParent
+
+nodeSpan :: RedNode -> Span
+nodeSpan RedNode{rnTree, rnRange} = Span rnTree rnRange
+
+tokenSpan :: RedToken -> Span
+tokenSpan t = Span (tokenTree t) (rtRange t)
+
 buildChildren :: RedNode -> V.Vector Red
 buildChildren
     parent@( RedNode
                 { rnGreen = GreenNode{gnChildren}
+                , rnTree
                 , rnRange = (Range start _)
                 }
             ) =
@@ -79,7 +91,7 @@ buildChildren
                                         , rtGreen = greenToken
                                         }
                             GNode greenNode ->
-                                RNode $ mkRedNode greenNode (Just parent) (Range prev end) i
+                                RNode $ mkRedNode rnTree greenNode (Just parent) (Range prev end) i
                     in end `seq` (end, child)
                 )
                 start

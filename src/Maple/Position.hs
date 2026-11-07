@@ -1,10 +1,22 @@
 module Maple.Position where
+
+import Data.Hashable (Hashable)
 import qualified Data.Text as T
 
 type Pos = Int
 
 -- Exclusive end
 data Range = Range Pos Pos deriving (Show, Eq)
+
+newtype TreeId = TreeId Int
+    deriving (Show, Eq, Ord)
+    deriving newtype (Hashable)
+
+data Span = Span
+    { spanTree :: !TreeId
+    , spanRange :: !Range
+    }
+    deriving (Show, Eq)
 
 posInRange :: Pos -> Range -> Bool
 posInRange p (Range s e) = s <= p && p < e

@@ -14,7 +14,8 @@ import GHC.TypeLits (ErrorMessage (Text), TypeError)
 import Data.Proxy (Proxy (Proxy))
 import Data.Typeable (Typeable, tyConName, typeRep, typeRepTyCon)
 import Maple.Green (GreenNode (GreenNode, gnKind), RawKind)
-import Maple.Red (Red (RToken, RNode), RedNode (RedNode, rnGreen), RedToken, materializeChildren, tokenKind)
+import Maple.Position (Span)
+import Maple.Red (Red (RToken, RNode), RedNode (RedNode, rnGreen), RedToken, materializeChildren, nodeSpan, tokenKind, tokenSpan)
 import Data.Vector.Strict (mapMaybe)
 import qualified Data.Vector.Strict as V
 
@@ -31,6 +32,9 @@ class AstNode a where
     canCast :: Proxy a -> RawKind -> Bool
     unsafeWrap :: RedNode -> a
     syntax :: a -> RedNode
+
+syntaxSpan :: (AstNode a) => a -> Span
+syntaxSpan = nodeSpan . syntax
 
 cast :: forall a. (AstNode a) => RedNode -> Maybe a
 cast red@(RedNode{rnGreen = GreenNode{gnKind}})
@@ -61,6 +65,9 @@ class AstToken t where
     canCastToken :: Proxy t -> RawKind -> Bool
     unsafeWrapToken :: RedToken -> t
     syntaxToken :: t -> RedToken
+
+syntaxTokenSpan :: (AstToken t) => t -> Span
+syntaxTokenSpan = tokenSpan . syntaxToken
 
 castToken :: forall t. (AstToken t) => RedToken -> Maybe t
 castToken tok
