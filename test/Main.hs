@@ -9,7 +9,7 @@ import Data.Data (Data)
 import Data.Maybe (isJust, isNothing)
 import GHC.Generics (Generic, Generically (Generically))
 import Maple.Ast (AstNode (syntax), AstToken, OfKind (OfKind), SyntaxKind (toRaw), TokenOfKind (TokenOfKind), cast, childToken, children, syntaxSpan, syntaxTokenSpan)
-import Maple.Builder (BuilderM, cleanRunBuilder, finishNode, runBuilder, startNode, token)
+import Maple.Builder (BuilderM, checkpoint, cleanRunBuilder, finishNode, runBuilder, startNode, startNodeAt, token)
 import Maple.Green (GreenNode (gnWidth), greenNodeEq)
 import Maple.Print (prettyGreen, prettyRed, showKind)
 import Maple.Position (Range (Range), Span (Span), TreeId (TreeId))
@@ -107,6 +107,21 @@ main = hspec $ do
                 describe' (Just (AStar _)) = "star"
                 describe' Nothing = "none"
             describe' (childToken (materializeRoot tree0 n) :: Maybe Atom) `shouldBe` ("number" :: String)
+    describe "Checkpoint" $ do
+        it "wraps only the children added since the checkpoint" $ do
+            (n, _) <- cleanRunBuilder $ do
+                startNode kMul
+                token kNumber "1"
+                cp <- checkpoint
+                startNode kLit
+                token kNumber "2"
+                finishNode
+                token kStar "*"
+                startNodeAt cp kMul
+                finishNode
+                finishNode
+            prettyGreen (showKind @Kind) n
+                `shouldBe` "KMul 3\n  KNumber \"1\"\n  KMul 2\n    KLit 1\n      KNumber \"2\"\n    KStar \"*\"\n"
     describe "Print" $ do
         it "pretty prints a green tree" $ do
             (n, _) <- cleanRunBuilder twoTimesTwo

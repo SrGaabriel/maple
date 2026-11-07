@@ -8,9 +8,9 @@ module Maple.Builder where
 
 import Control.Monad.State.Strict
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Vector.Strict as V
-import qualified Maple.Cache as Cache
+import Data.Text qualified as T
+import Data.Vector.Strict qualified as V
+import Maple.Cache qualified as Cache
 import Maple.Green (Green (GNode, GToken), GreenNode, RawKind)
 import Symbolize (intern)
 
@@ -67,6 +67,32 @@ token kind text = do
                 , bsCache = cache'
                 }
         )
+
+data Checkpoint = Checkpoint
+    { cpDepth :: !Int
+    , cpCount :: !Int
+    }
+
+checkpoint :: (Monad m) => BuilderT m Checkpoint
+checkpoint = do
+    open <- gets bsOpen
+    case open of
+        Frame{frCount} : _ -> pure Checkpoint{cpDepth = length open, cpCount = frCount}
+        [] -> error "checkpoint: no open node"
+
+startNodeAt :: (Monad m) => Checkpoint -> RawKind -> BuilderT m ()
+startNodeAt Checkpoint{cpDepth, cpCount} kind = modify' $ \st -> case bsOpen st of
+    frame@Frame{frChildren, frCount} : rest
+        | length (bsOpen st) == cpDepth && cpCount <= frCount ->
+            let adopted = frCount - cpCount
+                (moved, kept) = splitAt adopted frChildren
+            in st
+                { bsOpen =
+                    Frame{frKind = kind, frChildren = moved, frCount = adopted}
+                        : frame{frChildren = kept, frCount = cpCount}
+                        : rest
+                }
+    _ -> error "startNodeAt: stale checkpoint (the node it was taken in is no longer innermost)"
 
 finishNode :: (MonadIO m) => BuilderT m ()
 finishNode = do
