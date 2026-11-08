@@ -7,15 +7,15 @@ module Main where
 
 import Data.Data (Data)
 import Data.Maybe (isJust, isNothing)
+import Data.Vector.Strict qualified as V
 import GHC.Generics (Generic, Generically (Generically))
-import Maple.Ast (AstNode (syntax), AstToken, OfKind (OfKind), SyntaxKind (toRaw), TokenOfKind (TokenOfKind), cast, childToken, children, syntaxSpan, syntaxTokenSpan)
+import Maple.Ast (AstNode (syntax), AstToken, OfKind (OfKind), SyntaxKind (toRaw), TokenOfKind (TokenOfKind), cast, childToken, children)
 import Maple.Builder (BuilderM, checkpoint, cleanRunBuilder, finishNode, runBuilder, startNode, startNodeAt, token)
 import Maple.Green (GreenNode (gnWidth), greenNodeEq)
+import Maple.Position (Span (), TreeId (TreeId))
 import Maple.Print (prettyGreen, prettyRed, showKind)
-import Maple.Position (Range (Range), Span (Span), TreeId (TreeId))
 import Maple.Red (Red (RNode, RToken), RedNode, RedToken, materializeChildren, materializeRoot, nodeKind, nodeSpan, tokenSpan)
 import Test.Hspec
-import qualified Data.Vector.Strict as V
 
 data Kind = KNumber | KStar | KMul | KLit
     deriving (Eq, Show, Enum, Data)
